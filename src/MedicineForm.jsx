@@ -4,8 +4,13 @@ import { SLOTS } from './slots'
 const input =
   'mt-1 w-full rounded-xl border border-sky-200 bg-white px-4 py-3 text-lg'
 
-export default function MedicineForm({ onSave, onCancel }) {
-  const [form, setForm] = useState({ name: '', dose: '', times: [], stock: '' })
+export default function MedicineForm({ initial, onSave, onCancel }) {
+  const [form, setForm] = useState({
+    name: initial?.name ?? '',
+    dose: initial?.dose ?? '',
+    times: initial?.times ?? [],
+    stock: initial?.stock ?? '',
+  })
   const [error, setError] = useState('')
 
   const set = (field) => (e) => setForm({ ...form, [field]: e.target.value })
@@ -30,7 +35,9 @@ export default function MedicineForm({ onSave, onCancel }) {
 
   return (
     <form onSubmit={submit} className="space-y-4 rounded-3xl bg-white ring-1 ring-sky-100 p-5 shadow">
-      <h2 className="text-xl font-semibold text-sky-800">New medicine</h2>
+      <h2 className="text-xl font-semibold text-sky-800">
+        {initial ? 'Edit medicine' : 'New medicine'}
+      </h2>
 
       <label className="block text-sky-900">
         Medicine name

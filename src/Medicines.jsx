@@ -22,6 +22,9 @@ export default function Medicines() {
   const [medicines, setMedicines] = useState([])
   const [logs, setLogs] = useState([])
   const [adding, setAdding] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [restockId, setRestockId] = useState(null)
+  const [restockAmount, setRestockAmount] = useState('')
 
   const refresh = async () => {
     setMedicines(await loadAll('medicines'))
@@ -32,15 +35,29 @@ export default function Medicines() {
     refresh()
   }, [])
 
-  async function handleAdd(data) {
-    await addItem('medicines', data)
+  async function handleSave(data) {
+    if (editing) {
+      await updateItem('medicines', editing.id, data)
+    } else {
+      await addItem('medicines', data)
+    }
     await refresh()
     setAdding(false)
+    setEditing(null)
   }
 
   async function handleDelete(m) {
     if (!confirm(`Delete ${m.name}?`)) return
     await removeItem('medicines', m.id)
+    await refresh()
+  }
+
+  async function handleRestock(m) {
+    const amount = Number(restockAmount)
+    if (!amount || amount < 1) return
+    await updateItem('medicines', m.id, { stock: (hasStock(m) ? m.stock : 0) + amount })
+    setRestockId(null)
+    setRestockAmount('')
     await refresh()
   }
 
@@ -69,11 +86,19 @@ export default function Medicines() {
     meds: medicines.filter((m) => m.times.includes(s.id)),
   })).filter((s) => s.meds.length > 0)
 
+  const showForm = adding || editing
+
   return (
     <main className="mx-auto max-w-md p-5 pb-28">
-
-      {adding ? (
-        <MedicineForm onSave={handleAdd} onCancel={() => setAdding(false)} />
+      {showForm ? (
+        <MedicineForm
+          initial={editing}
+          onSave={handleSave}
+          onCancel={() => {
+            setAdding(false)
+            setEditing(null)
+          }}
+        />
       ) : (
         <>
           <button
@@ -136,22 +161,63 @@ export default function Medicines() {
                   const info = stockInfo(m)
                   return (
                     <li key={m.id} className="rounded-3xl bg-white ring-1 ring-sky-100 p-4 shadow">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-lg font-semibold text-sky-900">{m.name}</p>
-                          <p className="text-sm text-sky-700">
-                            {m.dose && `${m.dose} · `}
-                            {m.times.map((t) => SLOTS.find((s) => s.id === t)?.label).join(', ')}
-                          </p>
-                        </div>
-                        <button onClick={() => handleDelete(m)} className="px-2 py-1 text-sm text-red-600">
-                          Delete
-                        </button>
-                      </div>
+                      <p className="text-lg font-semibold text-sky-900">{m.name}</p>
+                      <p className="text-sm text-sky-700">
+                        {m.dose && `${m.dose} · `}
+                        {m.times.map((t) => SLOTS.find((s) => s.id === t)?.label).join(', ')}
+                      </p>
+
                       {info && (
                         <p className={`mt-2 rounded-lg px-3 py-2 text-sm font-medium ${info.cls}`}>
                           {info.text}
                         </p>
+                      )}
+
+                      {restockId === m.id ? (
+                        <div className="mt-3 flex gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            inputMode="numeric"
+                            placeholder="How many doses?"
+                            value={restockAmount}
+                            onChange={(e) => setRestockAmount(e.target.value)}
+                            className="min-w-0 flex-1 rounded-xl border border-sky-200 px-4 py-3 text-lg"
+                          />
+                          <button
+                            onClick={() => handleRestock(m)}
+                            className="rounded-xl bg-sky-500 px-5 py-3 font-semibold text-white"
+                          >
+                            Add
+                          </button>
+                          <button onClick={() => setRestockId(null)} className="px-2 text-sky-600">
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            onClick={() => {
+                              setRestockId(m.id)
+                              setRestockAmount('')
+                            }}
+                            className="flex-1 rounded-xl bg-sky-100 py-3 font-semibold text-sky-800"
+                          >
+                            ➕ Add stock
+                          </button>
+                          <button
+                            onClick={() => setEditing(m)}
+                            className="flex-1 rounded-xl bg-sky-100 py-3 font-semibold text-sky-800"
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(m)}
+                            className="rounded-xl px-3 py-3 text-sm text-red-600"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       )}
                     </li>
                   )

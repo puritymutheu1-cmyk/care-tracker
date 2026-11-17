@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import Appointments from './Appointments'
 import Medicines from './Medicines'
+import Backup from './Backup'
 
 const tabs = [
   { id: 'medicines', emoji: '💊', label: 'Medicines' },
   { id: 'appointments', emoji: '📅', label: 'Appointments' },
+  { id: 'backup', emoji: '💾', label: 'Backup' },
 ]
 
 export default function App() {
@@ -25,7 +27,9 @@ export default function App() {
         </div>
       </header>
 
-      {tab === 'medicines' ? <Medicines /> : <Appointments />}
+      {tab === 'medicines' && <Medicines />}
+      {tab === 'appointments' && <Appointments />}
+      {tab === 'backup' && <Backup />}
 
       <nav className="fixed inset-x-0 bottom-0 border-t border-sky-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-md gap-2 p-2">
@@ -33,7 +37,7 @@ export default function App() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex-1 rounded-2xl py-3 text-base font-bold ${
+              className={`flex-1 rounded-2xl py-3 text-sm font-bold ${
                 tab === t.id ? 'bg-sky-500 text-white shadow' : 'text-sky-400'
               }`}
             >

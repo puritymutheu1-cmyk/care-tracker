@@ -25,3 +25,8 @@ export async function removeItem(name, id) {
   const items = await loadAll(name)
   await saveAll(name, items.filter((i) => i.id !== id))
 }
+
+export async function updateItem(name, id, changes) {
+  const items = await loadAll(name)
+  await saveAll(name, items.map((i) => (i.id === id ? { ...i, ...changes } : i)))
+}

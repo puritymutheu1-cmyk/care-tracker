@@ -13,8 +13,8 @@ export default defineConfig({
         name: 'Little Steps',
         short_name: 'Little Steps',
         description: 'Medicines, visits and daily progress in one place',
-        theme_color: '#0f766e',
-        background_color: '#f0fdfa',
+        theme_color: '#0ea5e9',
+        background_color: '#e0f2fe',
         display: 'standalone',
         start_url: '/',
         icons: [

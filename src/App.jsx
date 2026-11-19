@@ -1,16 +1,57 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { supabase } from './supabase'
+import Auth from './Auth'
 import Appointments from './Appointments'
 import Medicines from './Medicines'
-import Backup from './Backup'
+import Account from './Account'
 
 const tabs = [
   { id: 'medicines', emoji: '💊', label: 'Medicines' },
   { id: 'appointments', emoji: '📅', label: 'Appointments' },
-  { id: 'backup', emoji: '💾', label: 'Backup' },
+  { id: 'account', emoji: '👤', label: 'Account' },
 ]
 
+const screen = 'flex min-h-screen items-center justify-center bg-sky-50 p-6 text-center text-sky-800'
+
 export default function App() {
+  const [session, setSession] = useState(undefined) // undefined = still loading
+  const [isMember, setIsMember] = useState(null)
   const [tab, setTab] = useState('medicines')
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    return () => data.subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (!session) return
+    supabase
+      .from('members')
+      .select('email')
+      .then(({ data, error }) => setIsMember(error ? true : data.length > 0))
+  }, [session])
+
+  if (session === undefined) return <div className={screen}>Loading...</div>
+  if (!session) return <Auth />
+  if (isMember === null) return <div className={screen}>Loading...</div>
+  if (!isMember)
+    return (
+      <div className={screen}>
+        <div>
+          <p className="mb-4 text-lg">
+            You're signed in as {session.user.email}, but this email is not on the family list yet.
+          </p>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="rounded-2xl bg-sky-500 px-6 py-3 font-semibold text-white"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    )
+
   const current = tabs.find((t) => t.id === tab)
 
   return (
@@ -29,7 +70,7 @@ export default function App() {
 
       {tab === 'medicines' && <Medicines />}
       {tab === 'appointments' && <Appointments />}
-      {tab === 'backup' && <Backup />}
+      {tab === 'account' && <Account email={session.user.email} />}
 
       <nav className="fixed inset-x-0 bottom-0 border-t border-sky-100 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-md gap-2 p-2">

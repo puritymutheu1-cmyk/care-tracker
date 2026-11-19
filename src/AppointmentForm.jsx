@@ -1,12 +1,16 @@
 import { useState } from 'react'
 
-const empty = { date: '', time: '', hospital: '', doctor: '', note: '' }
-
 const input =
   'mt-1 w-full rounded-xl border border-sky-200 bg-white px-4 py-3 text-lg'
 
-export default function AppointmentForm({ onSave, onCancel }) {
-  const [form, setForm] = useState(empty)
+export default function AppointmentForm({ defaultDate, onSave, onCancel }) {
+  const [form, setForm] = useState({
+    date: defaultDate || '',
+    time: '',
+    hospital: '',
+    doctor: '',
+    note: '',
+  })
   const set = (field) => (e) => setForm({ ...form, [field]: e.target.value })
 
   function submit(e) {

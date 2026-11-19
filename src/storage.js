@@ -1,58 +1,83 @@
-// All saving goes through this file. Today it uses the phone's storage;
-// later we swap the inside for Supabase and the screens stay the same.
-const PREFIX = 'littlesteps:'
+import { supabase } from './supabase'
 
-export async function loadAll(name) {
-  try {
-    return JSON.parse(localStorage.getItem(PREFIX + name)) ?? []
-  } catch {
-    return []
+const TABLES = { medicines: 'medicines', appointments: 'appointments', doseLogs: 'dose_logs' }
+const CACHE = 'littlesteps-cache:'
+
+// app shape <-> database shape
+function fromDb(name, row) {
+  if (name === 'medicines') return { ...row, stock: row.stock ?? '' }
+  if (name === 'doseLogs') {
+    const { medicine_id, given_at, given_by, ...rest } = row
+    return { ...rest, medicineId: medicine_id, givenAt: given_at, givenBy: given_by }
   }
+  return row
 }
 
-async function saveAll(name, items) {
-  localStorage.setItem(PREFIX + name, JSON.stringify(items))
+function toDb(name, item) {
+  if (name === 'medicines') {
+    if (!('stock' in item)) return item
+    return { ...item, stock: item.stock === '' || item.stock == null ? null : Number(item.stock) }
+  }
+  if (name === 'doseLogs') {
+    const { medicineId, givenAt, ...rest } = item
+    return { ...rest, medicine_id: medicineId, ...(givenAt ? { given_at: givenAt } : {}) }
+  }
+  return item
+}
+
+function fail(error) {
+  console.error(error)
+  alert('Could not save. Please check your internet and try again.')
+  throw error
+}
+
+export async function loadAll(name) {
+  let query = supabase.from(TABLES[name]).select('*')
+  if (name !== 'doseLogs') query = query.order('created_at', { ascending: true })
+  const { data, error } = await query
+  if (error) {
+    // offline or a problem: show the last copy this phone saw
+    try {
+      return JSON.parse(localStorage.getItem(CACHE + name)) ?? []
+    } catch {
+      return []
+    }
+  }
+  const items = data.map((row) => fromDb(name, row))
+  try {
+    localStorage.setItem(CACHE + name, JSON.stringify(items))
+  } catch {
+    /* ignore */
+  }
+  return items
 }
 
 export async function addItem(name, item) {
-  const items = await loadAll(name)
-  const saved = { ...item, id: crypto.randomUUID() }
-  await saveAll(name, [...items, saved])
-  return saved
+  const row = toDb(name, item)
+  if (name === 'doseLogs') {
+    const { data: auth } = await supabase.auth.getSession()
+    row.given_by = auth.session?.user?.email ?? null
+  }
+  const { data, error } = await supabase.from(TABLES[name]).insert(row).select().single()
+  if (error) {
+    if (error.code === '23505') return null // someone already marked this dose
+    fail(error)
+  }
+  return fromDb(name, data)
 }
 
 export async function removeItem(name, id) {
-  const items = await loadAll(name)
-  await saveAll(name, items.filter((i) => i.id !== id))
+  const { error } = await supabase.from(TABLES[name]).delete().eq('id', id)
+  if (error) fail(error)
 }
 
 export async function updateItem(name, id, changes) {
-  const items = await loadAll(name)
-  await saveAll(name, items.map((i) => (i.id === id ? { ...i, ...changes } : i)))
+  const { error } = await supabase.from(TABLES[name]).update(toDb(name, changes)).eq('id', id)
+  if (error) fail(error)
 }
 
 export async function exportAll() {
   const data = {}
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (key.startsWith(PREFIX)) {
-      data[key.slice(PREFIX.length)] = JSON.parse(localStorage.getItem(key))
-    }
-  }
-  return { app: 'little-steps', version: 1, exportedAt: new Date().toISOString(), data }
-}
-
-export async function importAll(backup) {
-  if (backup?.app !== 'little-steps' || typeof backup.data !== 'object' || !backup.data) {
-    throw new Error('This is not a Little Steps backup file.')
-  }
-  const keys = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (key.startsWith(PREFIX)) keys.push(key)
-  }
-  keys.forEach((k) => localStorage.removeItem(k))
-  for (const [name, items] of Object.entries(backup.data)) {
-    if (Array.isArray(items)) await saveAll(name, items)
-  }
+  for (const name of Object.keys(TABLES)) data[name] = await loadAll(name)
+  return { app: 'little-steps', version: 2, exportedAt: new Date().toISOString(), data }
 }
